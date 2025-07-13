@@ -72,7 +72,7 @@ class DFDataset(BaseDataset):
         """
         self.root_dir = root_dir
         self.images = data_frame["ImageID"].values
-        self.labels = data_frame["healthy"].values.astype(np.long)
+        self.labels = data_frame["healthy"].values.astype(np.int64)
         # self.labels = np.argmax(self.labels, axis=1)
         self.transform = transform
         super(DFDataset, self).__init__(

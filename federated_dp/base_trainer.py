@@ -1,6 +1,3 @@
-"""
-Base FedAvg Trainer
-"""
 import sys, os
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -158,8 +155,10 @@ class BaseFederatedTrainer(object):
         self.test_loss["mean"] = []
 
         self.virtual_clients = args.virtual_clients if not args.ada_vn else 1
+        self.domain_loss_fun = None  # Will be set in run method
+        self.class_weights = kwargs["class_weights"] if "class_weights" in kwargs else None
 
-    def train(self, model, data_loader, optimizer, loss_fun):
+    def train(self, model, data_loader, optimizer, loss_fun, domain_loss_fun=None, client_idx=None):
         model.to(self.device)
         # optimizer.load_state_dict(optimizer.state_dict())
         # print(optimizer.state.values())
@@ -188,13 +187,24 @@ class BaseFederatedTrainer(object):
 
             optimizer.zero_grad()
             inp = inp.to(self.device)
-            output = model(inp)
+            if self.args.da and domain_loss_fun is not None and client_idx is not None:
+                output, domain_output = model(inp, domain_label=True)  # Any non-None value to trigger domain adaptation
+                domain_label = torch.full((inp.size(0),), client_idx, dtype=torch.long, device=self.device)
+                domain_loss = domain_loss_fun(domain_output, domain_label)
+            else:
+                output = model(inp)
+                domain_loss = 0
 
             if self.args.data.startswith("prostate"):
-                loss = loss_fun(output[:, 0, :, :], target)
+                task_loss = loss_fun(output[:, 0, :, :], target)
             else:
-                loss = loss_fun(output, target)
+                if self.class_weights is not None and client_idx is not None:
+                    weighted_loss_fun = nn.CrossEntropyLoss(weight=self.class_weights[client_idx].to(self.device))
+                    task_loss = weighted_loss_fun(output, target)
+                else:
+                    task_loss = loss_fun(output, target)
 
+            loss = task_loss + self.args.alpha * domain_loss
             loss_all += loss.item()
 
             if segmentation:
@@ -634,7 +644,7 @@ class BaseFederatedTrainer(object):
                         optimizer_metrics[metric_name] = metric.to(self.device)
 
             train_loss, train_acc = self.train(
-                model, train_loaders[client_idx], self.optimizers[client_idx], loss_fun
+                model, train_loaders[client_idx], self.optimizers[client_idx], loss_fun, domain_loss_fun=self.domain_loss_fun, client_idx=client_idx
             )
             client_update = self._compute_param_update(
                 old_model=old_model, new_model=model, device="cpu"
@@ -761,9 +771,11 @@ class BaseFederatedTrainer(object):
         loss_fun,
         SAVE_PATH,
         generalize_sites=None,
+        domain_loss_fun=None,
     ):
         self.val_loaders = val_loaders
         self.loss_fun = loss_fun
+        self.domain_loss_fun = domain_loss_fun
 
         real_train_loaders = copy.deepcopy(train_loaders)
 
@@ -1083,6 +1095,7 @@ class BaseFederatedTrainer(object):
         loss_fun,
         SAVE_PATH,
         generalize_sites=None,
+        domain_loss_fun=None,
     ):
         self.run(
             train_loaders,
@@ -1091,5 +1104,6 @@ class BaseFederatedTrainer(object):
             loss_fun,
             SAVE_PATH,
             generalize_sites,
+            domain_loss_fun=domain_loss_fun,
         )
         self.logging.info(" Training completed...")
