@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_path)
@@ -157,8 +158,9 @@ class BaseFederatedTrainer(object):
         self.virtual_clients = args.virtual_clients if not args.ada_vn else 1
         self.domain_loss_fun = None  # Will be set in run method
         self.class_weights = kwargs["class_weights"] if "class_weights" in kwargs else None
+        self.client_domain_map = kwargs["client_domain_map"] if "client_domain_map" in kwargs else None
 
-    def train(self, model, data_loader, optimizer, loss_fun, domain_loss_fun=None, client_idx=None):
+    def train(self, model, data_loader, optimizer, loss_fun, domain_loss_fun=None, client_idx=None, a_iter=0):
         model.to(self.device)
         # optimizer.load_state_dict(optimizer.state_dict())
         # print(optimizer.state.values())
@@ -174,6 +176,8 @@ class BaseFederatedTrainer(object):
         train_acc = 0.0 if not segmentation else {}
         model_pred, label_gt, pred_prob = [], [], []
         num_sample_test = 0
+        domain_correct = 0
+        domain_total = 0
 
         for step, data in enumerate(data_loader):
             if self.args.data.startswith("prostate"):
@@ -189,8 +193,19 @@ class BaseFederatedTrainer(object):
             inp = inp.to(self.device)
             if self.args.da and domain_loss_fun is not None and client_idx is not None:
                 output, domain_output = model(inp, domain_label=True)  # Any non-None value to trigger domain adaptation
-                domain_label = torch.full((inp.size(0),), client_idx, dtype=torch.long, device=self.device)
-                domain_loss = domain_loss_fun(domain_output, domain_label)
+                # SỬA: Lấy domain labels per sample từ data
+                if 'Domain' in data:
+                    domain_labels = data['Domain'].to(self.device)
+                else:
+                    # Fallback nếu không có (cho dataset khác)
+                    domain_labels = torch.full((inp.size(0),), self.client_domain_map[client_idx] if self.client_domain_map else client_idx, dtype=torch.long, device=self.device)
+                
+                domain_loss = domain_loss_fun(domain_output, domain_labels)
+
+                # Compute domain accuracy for debugging
+                domain_pred = domain_output.argmax(dim=1)
+                domain_correct += (domain_pred == domain_labels).sum().item()
+                domain_total += domain_labels.size(0)
             else:
                 output = model(inp)
                 domain_loss = 0
@@ -204,7 +219,12 @@ class BaseFederatedTrainer(object):
                 else:
                     task_loss = loss_fun(output, target)
 
-            loss = task_loss + self.args.alpha * domain_loss
+            # Cải thiện lịch trình cho lambda_DA
+            total_rounds = self.args.rounds
+            progress = a_iter / total_rounds
+            gamma = 10.0
+            dann_lambda = (2. / (1. + math.exp(-gamma * progress))) - 1
+            loss = task_loss + dann_lambda * self.args.alpha * domain_loss
             loss_all += loss.item()
 
             if segmentation:
@@ -219,7 +239,7 @@ class BaseFederatedTrainer(object):
                         )
                         train_acc["IoU"] += _eval_iou(output[:, 0, :, :], target).item()
 
-                    for i_b in range(output.shape[0]):
+                    for i_b in range(output.shape(0)):
                         hd = _eval_haus(output[i_b, 0, :, :], target[i_b]).item()
                         if hd > 0:
                             train_acc["HD"] += hd
@@ -258,6 +278,11 @@ class BaseFederatedTrainer(object):
                 "Spe": metric_res[4],
                 "F1": metric_res[5],
             }
+
+        # Log domain accuracy if DA is enabled
+        if self.args.da and domain_loss_fun is not None and client_idx is not None:
+            domain_acc = domain_correct / domain_total if domain_total > 0 else 0
+            self.logging.info(f" Site-{client_idx} | Domain Acc: {domain_acc:.4f}")
 
         model.to("cpu")
         for optimizer_metrics in optimizer.state.values():
@@ -644,7 +669,7 @@ class BaseFederatedTrainer(object):
                         optimizer_metrics[metric_name] = metric.to(self.device)
 
             train_loss, train_acc = self.train(
-                model, train_loaders[client_idx], self.optimizers[client_idx], loss_fun, domain_loss_fun=self.domain_loss_fun, client_idx=client_idx
+                model, train_loaders[client_idx], self.optimizers[client_idx], loss_fun, domain_loss_fun=self.domain_loss_fun, client_idx=client_idx, a_iter=a_iter
             )
             client_update = self._compute_param_update(
                 old_model=old_model, new_model=model, device="cpu"

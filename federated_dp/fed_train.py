@@ -19,8 +19,8 @@ import torchvision
 
 from dataset.dataset import (
     ProstateDataset,
-    DFDataset,
     DatasetSplit,
+    DFDataset
 )
 
 from utils.util import setup_logger, get_timestamp
@@ -32,7 +32,7 @@ from nets.models import (
 
 import torchvision.transforms as transforms
 import monai.transforms as monai_transforms
-
+from torchvision.transforms import ColorJitter, GaussianBlur, RandomRotation, Compose
 from federated_dp.fedavg_trainer import FedAvgTrainer
 
 from federated_dp.private_trainer import PrivateFederatedTrainer
@@ -50,17 +50,24 @@ ssl._create_default_https_context = ssl._create_unverified_context
 LABELS = ['epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'healthy']
 
 # Gradient Reversal Layer for Domain Adaptation (DANN)
+class GradientReversalFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, lambda_):
+        ctx.lambda_ = lambda_
+        return x.clone()
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output * -ctx.lambda_, None
+
 class GradientReversalLayer(nn.Module):
     def __init__(self, lambda_=1.0):
         super(GradientReversalLayer, self).__init__()
         self.lambda_ = lambda_
 
     def forward(self, x):
-        return x
-
-    def backward(self, grad_output):
-        return grad_output * -self.lambda_
-
+        return GradientReversalFunction.apply(x, self.lambda_)
+        
 # Modified UNet with Domain Adaptation (DANN)
 class UNetDA(UNet):
     def __init__(self, out_channels=1):
@@ -73,7 +80,7 @@ class UNetDA(UNet):
             nn.ReLU(),
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(128, 20),  # Multi-domain classification (20 clients)
+            nn.Linear(128, args.clients),
         )
         self.grl = GradientReversalLayer()
 
@@ -90,15 +97,17 @@ class UNetDA(UNet):
 
 # Modified DenseNet with Domain Adaptation (DANN)
 class DenseNetDA(DenseNet):
-    def __init__(self, num_classes=2):
+    def __init__(self, num_classes=2, args=None):
         super(DenseNetDA, self).__init__(num_classes=num_classes)
         # Domain classifier: assumes features from the dense blocks
         self.domain_classifier = nn.Sequential(
-            nn.Linear(1024, 512),  # Assuming features size from avgpool
+            nn.Linear(1024, 512),
             nn.ReLU(),
+            nn.Dropout(0.5),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(256, 20),  # Multi-domain classification (20 clients)
+            nn.Dropout(0.5),
+            nn.Linear(256, args.clients),  
         )
         self.grl = GradientReversalLayer()
 
@@ -116,88 +125,83 @@ class DenseNetDA(DenseNet):
             return cls_output, domain_output
         return cls_output
 
-def split_label_majority(df, labels, n_clients=20, random_state=42):
-    """
-    Chia đều sample cho các client, mỗi client ưu tiên 1 nhãn chính (label-majority).
-    Đã chỉnh sửa để phân bổ samples của nhãn ưu tiên đều đặn trong nhóm client cùng ưu tiên một nhãn, tránh tình trạng client sau thiếu samples.
-    Thêm oversampling (with replacement) nếu không đủ samples unique để đạt tỷ lệ 70%.
-    Đặc biệt: healthy group sẽ lấy phần còn lại từ disease samples.
-    """
-    df = df.sample(frac=1, random_state=random_state).reset_index(drop=True)
-    client_size = len(df) // n_clients
-    extra = len(df) % n_clients
-    client_sizes = [client_size + (1 if i < extra else 0) for i in range(n_clients)]
+def split_data_new_strategy(df, n_clients=20, random_state=42):
+    np.random.seed(random_state)
+    random.seed(random_state)
     
-    # Định nghĩa nhóm client theo label major
-    groups = {
-        'healthy': list(range(0, 4)),
-        'subdural': list(range(4, 8)),
-        'epidural': list(range(8, 12)),
-        'intraparenchymal': list(range(12, 16)),
-        'subarachnoid': [16, 18],
-        'intraventricular': [17, 19]
-    }
+    # Phân nhóm clients: 12 chuyên gia (2 per label 0-5)
+    specialist_groups = {i: [2*i, 2*i+1] for i in range(6)}  # 0-11 specialists
+    general_clients = list(range(12, 20))
     
-    # Pre-allocate major samples cho từng client
-    major_allocations = [pd.DataFrame() for _ in range(n_clients)]
+    clients = [pd.DataFrame() for _ in range(n_clients)]
+    
+    # Bước 1: Xử lý ca chuyên biệt (chỉ 1 label=1, không multi, cho disease và healthy)
     used_idx = set()
-    
-    for label, client_list in groups.items():
-        if not client_list:
-            continue
-        label_samples = df[df[label] == 1].sample(frac=1, random_state=random_state)  # Shuffle samples
-        num_clients_in_group = len(client_list)
-        available = len(label_samples)
-        if available == 0:
-            continue
-        
-        # Phân bổ đều samples unique available cho các client trong nhóm
-        base_per_client = available // num_clients_in_group
-        extra_per_client = available % num_clients_in_group
-        label_client_alloc_sizes = [base_per_client + (1 if i < extra_per_client else 0) for i in range(num_clients_in_group)]
-        
-        idx = 0
-        for i, client_id in enumerate(client_list):
-            n_major_target = int(client_sizes[client_id] * 0.7)
-            unique_alloc_size = min(label_client_alloc_sizes[i], n_major_target)
-            chosen_major = label_samples.iloc[idx:idx + unique_alloc_size]
-            
-            # Nếu chưa đủ n_major_target, oversample with replacement từ label_samples
-            current_len = len(chosen_major)
-            if current_len < n_major_target:
-                additional = n_major_target - current_len
-                oversample = label_samples.sample(n=additional, replace=True, random_state=random_state)
-                chosen_major = pd.concat([chosen_major, oversample])
-            
-            # Chỉ update used_idx với các samples unique
-            unique_chosen = chosen_major.drop_duplicates(subset=chosen_major.columns.difference(['index'] if 'index' in chosen_major.columns else []))
-            used_idx.update(unique_chosen.index)
-            
-            major_allocations[client_id] = chosen_major
-            idx += unique_alloc_size  # Chỉ di chuyển idx theo unique alloc
-    
-    # Fill remain cho từng client
-    clients = []
-    healthy_group = groups['healthy']
-    for i in range(n_clients):
-        chosen_major = major_allocations[i]
-        n_remain = client_sizes[i] - len(chosen_major)
-        remain_df = df[~df.index.isin(used_idx)]
-        if i in healthy_group:
-            # For healthy clients, sample remain from disease samples (healthy==0)
-            disease_remain = remain_df[remain_df['healthy'] == 0]
-            # Sample with replacement if not enough
-            chosen_remain = disease_remain.sample(n=n_remain, replace=(n_remain > len(disease_remain)), random_state=random_state) if n_remain > 0 and len(disease_remain) > 0 else pd.DataFrame()
-            # Update used_idx with unique samples
-            unique_chosen = chosen_remain.drop_duplicates(subset=chosen_remain.columns.difference(['index'] if 'index' in chosen_remain.columns else []))
-            used_idx.update(unique_chosen.index)
+    for label_idx, label in enumerate(LABELS):
+        if label == 'healthy':
+            specialist_samples = df[df['healthy'] == 1]
         else:
-            chosen_remain = remain_df.sample(n=min(n_remain, len(remain_df)), random_state=random_state) if n_remain > 0 and len(remain_df) > 0 else pd.DataFrame()
-            used_idx.update(chosen_remain.index)
-        client_df = pd.concat([chosen_major, chosen_remain]).sample(frac=1, random_state=random_state).reset_index(drop=True)
-        clients.append(client_df)
+            specialist_samples = df[(df[label] == 1) & (df[LABELS].drop(label, axis=1).sum(axis=1) == 0) & (df['healthy'] == 0)]
+        
+        num_samples = len(specialist_samples)
+        if num_samples == 0:
+            continue
+        
+        # 60% cho chuyên gia
+        n_specialist = int(num_samples * 0.6)
+        specialist_samples_shuffled = specialist_samples.sample(frac=1, random_state=random_state)
+        allocated = specialist_samples_shuffled.iloc[:n_specialist]
+        
+        # Chia đều cho 2 chuyên gia
+        client1, client2 = specialist_groups[label_idx]
+        half = n_specialist // 2
+        clients[client1] = pd.concat([clients[client1], allocated.iloc[:half]])
+        clients[client2] = pd.concat([clients[client2], allocated.iloc[half:n_specialist]])
+        
+        used_idx.update(allocated.index)
+    
+    # Dữ liệu còn lại: 40% chuyên biệt + multi-label
+    remaining_df = df[~df.index.isin(used_idx)]
+    
+    # Shuffle và chia đều cho 20 clients
+    remaining_shuffled = remaining_df.sample(frac=1, random_state=random_state)
+    chunk_size = len(remaining_shuffled) // n_clients
+    for i in range(n_clients):
+        start = i * chunk_size
+        end = start + chunk_size if i < n_clients - 1 else len(remaining_shuffled)
+        clients[i] = pd.concat([clients[i], remaining_shuffled.iloc[start:end]])
+    
+    # Shuffle từng client df
+    for i in range(n_clients):
+        clients[i] = clients[i].sample(frac=1, random_state=random_state).reset_index(drop=True)
     
     return clients
+
+def get_client_transforms(n_clients=20):
+    transforms_list = []
+    for i in range(n_clients):
+        if i % 5 == 0:
+            trans = ColorJitter(contrast=0.2 * ((i//5) % 3 + 1))
+        elif i % 5 == 1:
+            trans = GaussianBlur(kernel_size=3 + 2*(i//5 % 3), sigma=(0.1 + 0.2*(i//5 % 3), 1.0 + 0.5*(i//5 % 3)))
+        elif i % 5 == 2:
+            trans = ColorJitter(brightness=0.2 * ((i//5) % 3 + 1))
+        elif i % 5 == 3:
+            trans = RandomRotation(degrees=5 + 5*(i//5 % 3))
+        else:
+            trans = Compose([GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)), RandomRotation(10)])
+        full_trans = Compose([
+            transforms.Resize((224, 224)),
+            trans,  # Biến đổi đặc trưng per client
+            transforms.RandomAffine(degrees=20, translate=(0.08, 0.08), scale=(0.9, 1.1)),
+            transforms.ColorJitter(brightness=0.12, contrast=0.15, saturation=0.12, hue=0.06),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+        transforms_list.append(full_trans)
+    return transforms_list
 
 def split_df(args, data_frame, num_users):
     print("Splitting data into {} users".format(num_users))
@@ -242,6 +246,7 @@ def balance_split_dataset(all_datasets, num_total_users):
 
 
 def initialize(args, logging):
+    train_sites = []
     assert args.data in [
         "prostate",
         "RSNA-ICH",
@@ -304,6 +309,41 @@ def initialize(args, logging):
                 wholeset = torch.utils.data.ConcatDataset([trainset, valset, testset])
                 logging.info(f"[Unseen Client {site}] Test={len(wholeset)}")
                 testsets.append(wholeset)
+            real_trainsets = trainsets  # FIXED: Set real_trainsets for virtual splitting
+            train_data_sizes = [len(s) for s in real_trainsets]  # FIXED: For possible client selection
+            if args.clients < len(sites):
+                idx = np.argsort(np.array(train_data_sizes))[::-1][: args.clients]
+                real_trainsets = [real_trainsets[i] for i in idx]
+                sites = [sites[i] for i in idx]
+                valsets = [valsets[i] for i in idx]
+                train_data_sizes = [train_data_sizes[i] for i in idx]
+            if args.virtual_clients > 0:
+                trainsets = []  # Reset trainsets for virtual
+                if args.balance_split:
+                    dict_users = balance_split_dataset(
+                        real_trainsets, len(real_trainsets) * args.virtual_clients
+                    )
+                    for c_idx, client_trainset in enumerate(real_trainsets):
+                        for v_idx in range(len(dict_users[c_idx])):
+                            virtual_trainset = DatasetSplit(
+                                client_trainset, dict_users[c_idx][v_idx], c_idx, v_idx
+                            )
+                            trainsets.append(virtual_trainset)
+                            logging.info(
+                                f"[Virtual Client {c_idx}-{v_idx}] Train={len(virtual_trainset)}"
+                            )
+                else:
+                    for c_idx, client_trainset in enumerate(real_trainsets):
+                        dict_users = split_dataset(client_trainset, args.virtual_clients)
+                        for v_idx in range(args.virtual_clients):
+                            virtual_trainset = DatasetSplit(
+                                client_trainset, dict_users[v_idx], c_idx, v_idx
+                            )
+                            trainsets.append(virtual_trainset)
+                            logging.info(
+                                f"[Virtual Client {c_idx}-{v_idx}] Train={len(virtual_trainset)}"
+                            )
+            train_sites = list(range(len(trainsets)))  # FIXED: Update based on actual number
         else:
             for site in sites:
                 if site == args.free:
@@ -369,7 +409,10 @@ def initialize(args, logging):
                 if int(args.leave) in sites:
                     leave_idx = sites.index(int(args.leave))
                     sites.pop(leave_idx)
-                    trainsets.pop(leave_idx)
+                    real_trainsets.pop(leave_idx)  # FIXED: Pop real_trainsets instead of trainsets
+                    valsets.pop(leave_idx)
+                    testsets.pop(leave_idx)
+                    train_data_sizes.pop(leave_idx)  # FIXED: Pop train_data_sizes
                     logging.info("New sites:" + str(sites))
                     generalize_sites = [int(args.leave)]
                 else:
@@ -379,6 +422,8 @@ def initialize(args, logging):
                 idx = np.argsort(np.array(train_data_sizes))[::-1][: args.clients]
                 real_trainsets = [real_trainsets[i] for i in idx]
                 sites = [sites[i] for i in idx]
+                valsets = [valsets[i] for i in idx]
+                testsets = [testsets[i] for i in idx]  # FIXED: Pop testsets too if merge not set yet
 
             if args.virtual_clients > 0:
                 if args.balance_split:
@@ -406,12 +451,17 @@ def initialize(args, logging):
                             logging.info(
                                 f"[Virtual Client {c_idx}-{v_idx}] Train={len(virtual_trainset)}"
                             )
+            else:
+                trainsets = real_trainsets  # FIXED: Set trainsets if no virtual
+            train_sites = list(range(len(trainsets)))  # FIXED: Update
     elif args.data == "RSNA-ICH":
         N_total_client = 20
         assert args.clients <= N_total_client
+        sites = list(range(N_total_client))
+        generalize_sites = None
 
         if args.da:
-            model = DenseNetDA(num_classes=2)
+            model = DenseNetDA(num_classes=2, args=args)
         else:
             model = DenseNet(num_classes=2)
         if args.pretrain:
@@ -425,7 +475,7 @@ def initialize(args, logging):
                 if (k in model_dict and "classifier" not in k and "domain_classifier" not in k)
             }
             model.load_state_dict(pretrained_dict, strict=False)
-        loss_fun = nn.CrossEntropyLoss()
+        loss_fun = nn.CrossEntropyLoss()  # Dùng CrossEntropyLoss mặc định, sẽ truyền class_weights khi train
         domain_loss_fun = nn.CrossEntropyLoss()  # For domain adaptation loss
         train_sites = list(range(args.clients * args.virtual_clients))  # virtual clients
         val_sites = list(range(N_total_client))  # original clients
@@ -433,24 +483,16 @@ def initialize(args, logging):
         ich_folder = "binary_25k"
 
         train_df = pd.read_csv(f"../dataset/RSNA-ICH/{ich_folder}/train.csv")
-        train_dfs = split_label_majority(train_df, LABELS, n_clients=N_total_client, random_state=args.seed)
+        train_dfs = split_data_new_strategy(train_df, n_clients=N_total_client, random_state=args.seed)
         
         val_df = pd.read_csv(f"../dataset/RSNA-ICH/{ich_folder}/validate.csv")
-        val_dfs = split_label_majority(val_df, LABELS, n_clients=N_total_client, random_state=args.seed)
+        val_dfs = split_data_new_strategy(val_df, n_clients=N_total_client, random_state=args.seed)
         
         test_df = pd.read_csv(f"../dataset/RSNA-ICH/{ich_folder}/test.csv")
-        test_dfs = split_label_majority(test_df, LABELS, n_clients=N_total_client, random_state=args.seed)
+        test_dfs = split_data_new_strategy(test_df, n_clients=N_total_client, random_state=args.seed)
 
         """split trainsets for virtual clients"""
-        transform_list = transforms.Compose(
-            [
-                transforms.Resize((224, 224)),
-                transforms.RandomAffine(degrees=10, translate=(0.02, 0.02)),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            ]
-        )
+        client_transforms = get_client_transforms(N_total_client)
         transform_test = transforms.Compose(
             [
                 transforms.Resize((224, 224)),
@@ -459,12 +501,14 @@ def initialize(args, logging):
             ]
         )
         real_trainsets = []
-        class_weights = []
+        valsets_all = []
+        testsets_all = []
+        class_weights_all = []
         for idx in range(N_total_client):
             trainset = DFDataset(
-                root_dir="../data/RSNA-ICH/organized/stage_2_train",    # TODO: change the path here
+                root_dir="../data/RSNA-ICH/organized/stage_2_train",    
                 data_frame=train_dfs[idx],
-                transform=transform_list,
+                transform=client_transforms[idx],
                 site_idx=idx,
             )
             valset = DFDataset(
@@ -474,7 +518,7 @@ def initialize(args, logging):
                 site_idx=idx,
             )
             testset = DFDataset(
-                root_dir="../RSNA-ICH/organized/stage_2_train",
+                root_dir="../data/RSNA-ICH/organized/stage_2_train",
                 data_frame=test_dfs[idx],
                 transform=transform_test,
                 site_idx=idx,
@@ -484,8 +528,8 @@ def initialize(args, logging):
             )
             train_data_sizes.append(len(trainset))
             real_trainsets.append(trainset)
-            valsets.append(valset)
-            testsets.append(testset)
+            valsets_all.append(valset)
+            testsets_all.append(testset)
             # Compute class weights for this client
             df = train_dfs[idx]
             num_healthy = (df['healthy'] == 1).sum()
@@ -497,31 +541,135 @@ def initialize(args, logging):
             total = len(df)
             weight_healthy = total / (2.0 * num_healthy)
             weight_disease = total / (2.0 * num_disease)
-            class_weights.append(torch.tensor([weight_healthy, weight_disease], dtype=torch.float32))
+            class_weights_all.append(torch.tensor([weight_healthy, weight_disease], dtype=torch.float32))
+
+        # Sửa lỗi: Đảm bảo trainsets luôn được gán từ real_trainsets
+        trainsets = real_trainsets
+        valsets = valsets_all
+        testsets = testsets_all
+        class_weights = class_weights_all
+
+        # Sửa lỗi: Nếu số client mong muốn < N_total_client, chỉ giữ lại đúng số lượng client
+        if args.clients < N_total_client:
+            import numpy as np
+            selected_client_indices = np.random.choice(N_total_client, args.clients, replace=False)
+            selected_client_indices = sorted(selected_client_indices)
+            trainsets = [real_trainsets[i] for i in selected_client_indices]
+            valsets = [valsets_all[i] for i in selected_client_indices]
+            testsets = [testsets_all[i] for i in selected_client_indices]
+            class_weights = [class_weights_all[i] for i in selected_client_indices]
+            sites = selected_client_indices  # FIXED: Update sites
+            train_sites = list(range(args.clients))
+            val_sites = [val_sites[i] for i in selected_client_indices]
+        else:
+            trainsets = real_trainsets
+            valsets = valsets_all
+            testsets = testsets_all
+            class_weights = class_weights_all
+            train_sites = list(range(N_total_client))
 
         if args.merge:
             valset = torch.utils.data.ConcatDataset(valsets)
             testset = torch.utils.data.ConcatDataset(testsets)
 
-        if args.clients < N_total_client:
-            idx = np.argsort(np.array(train_data_sizes))[::-1][: args.clients]
-            real_trainsets = [real_trainsets[i] for i in idx]
-            class_weights = [class_weights[i] for i in idx]
-
-        full_class_weights = []
-        if args.virtual_clients > 0:
-            for c_idx, client_trainset in enumerate(real_trainsets):
-                dict_users = split_dataset(client_trainset, args.virtual_clients)
-                for v_idx in range(args.virtual_clients):
-                    virtual_trainset = DatasetSplit(
-                        client_trainset, dict_users[v_idx], c_idx, v_idx
-                    )
-                    trainsets.append(virtual_trainset)
-                    logging.info(f"[Virtual Client {c_idx}-{v_idx}] Train={len(virtual_trainset)}")
-                    full_class_weights.append(class_weights[c_idx])
+        if args.generalize and args.leave is not None and args.leave != "no":
+            # LOCO: Loại client leave_idx khỏi train/val, chỉ test trên client đó
+            leave_idx = int(args.leave)
+            assert 0 <= leave_idx < N_total_client
+            selected_client_indices = [i for i in range(N_total_client) if i != leave_idx]
+            sites = selected_client_indices
+            generalize_sites = [leave_idx]
+            train_sites = list(range(len(selected_client_indices)))
+            # Lọc lại các tập dữ liệu và class_weights cho train/val
+            real_trainsets = [real_trainsets[i] for i in selected_client_indices]
+            trainsets = real_trainsets  # FIXED: Update trainsets after filtering
+            valsets = [valsets_all[i] for i in selected_client_indices]
+            testsets = [testsets_all[i] for i in selected_client_indices]
+            class_weights = [class_weights_all[i] for i in selected_client_indices]
+            val_sites = [val_sites[i] for i in selected_client_indices]
+            client_domain_map = {i: i for i in range(len(selected_client_indices))}
+            # Log mapping client-domain
+            for i, idx in enumerate(selected_client_indices):
+                print(f"[RSNA-ICH] Train/Val Client {i} (gốc idx {idx}) là domain riêng biệt (domain index {i})")
+                logging.info(f"[RSNA-ICH] Train/Val Client {i} (gốc idx {idx}) là domain riêng biệt (domain index {i})")
+            # FIXED: Chuẩn bị testset cho domain unseen using wholeset (train + val + test of unseen client), matching Prostate logic
+            unseen_trainset = DFDataset(
+                root_dir="../data/RSNA-ICH/organized/stage_2_train",
+                data_frame=train_dfs[leave_idx],
+                transform=transform_test,
+                site_idx=leave_idx,
+            )
+            unseen_valset = DFDataset(
+                root_dir="../data/RSNA-ICH/organized/stage_2_train",
+                data_frame=val_dfs[leave_idx],
+                transform=transform_test,
+                site_idx=leave_idx,
+            )
+            unseen_testset = DFDataset(
+                root_dir="../data/RSNA-ICH/organized/stage_2_train",
+                data_frame=test_dfs[leave_idx],
+                transform=transform_test,
+                site_idx=leave_idx,
+            )
+            wholeset = torch.utils.data.ConcatDataset([unseen_trainset, unseen_valset, unseen_testset])
+            logging.info(f"[Unseen Client {leave_idx}] Test={len(wholeset)}")
+            unseen_testsets = [wholeset]
+            testsets = unseen_testsets  # FIXED: Use wholeset for unseen testsets
+            print(f"[RSNA-ICH] Unseen test client: {leave_idx}")
+            logging.info(f"[RSNA-ICH] Unseen test client: {leave_idx}")
         else:
-            full_class_weights = class_weights
+            if args.clients < N_total_client:
+                np.random.seed(args.seed)
+                selected_client_indices = np.random.choice(N_total_client, args.clients, replace=False)
+                selected_client_indices = sorted(selected_client_indices)
+                real_trainsets = [real_trainsets[i] for i in selected_client_indices]
+                trainsets = real_trainsets  # FIXED
+                valsets = [valsets_all[i] for i in selected_client_indices]
+                testsets = [testsets_all[i] for i in selected_client_indices]
+                class_weights = [class_weights_all[i] for i in selected_client_indices]
+                val_sites = [val_sites[i] for i in selected_client_indices]
+                client_domain_map = {i: i for i in range(len(selected_client_indices))}
+                train_sites = list(range(len(selected_client_indices)))
+                for i, idx in enumerate(selected_client_indices):
+                    print(f"[RSNA-ICH] Client {i} (gốc idx {idx}) là domain riêng biệt (domain index {i})")
+                    logging.info(f"[RSNA-ICH] Client {i} (gốc idx {idx}) là domain riêng biệt (domain index {i})")
+            else:
+                client_domain_map = {i: i for i in range(N_total_client)}
+                full_class_weights = class_weights
+                train_sites = list(range(N_total_client))
+
+        # FIXED: Add virtual clients splitting for RSNA in both generalize and non-generalize
+        real_trainsets = trainsets
+        if args.virtual_clients > 0:
+            trainsets = []
+            if args.balance_split:
+                dict_users = balance_split_dataset(
+                    real_trainsets, len(real_trainsets) * args.virtual_clients
+                )
+                for c_idx, client_trainset in enumerate(real_trainsets):
+                    for v_idx in range(len(dict_users[c_idx])):
+                        virtual_trainset = DatasetSplit(
+                            client_trainset, dict_users[c_idx][v_idx], c_idx, v_idx
+                        )
+                        trainsets.append(virtual_trainset)
+                        logging.info(
+                            f"[Virtual Client {c_idx}-{v_idx}] Train={len(virtual_trainset)}"
+                        )
+            else:
+                for c_idx, client_trainset in enumerate(real_trainsets):
+                    dict_users = split_dataset(client_trainset, args.virtual_clients)
+                    for v_idx in range(args.virtual_clients):
+                        virtual_trainset = DatasetSplit(
+                            client_trainset, dict_users[v_idx], c_idx, v_idx
+                        )
+                        trainsets.append(virtual_trainset)
+                        logging.info(
+                            f"[Virtual Client {c_idx}-{v_idx}] Train={len(virtual_trainset)}"
+                        )
+        train_sites = list(range(len(trainsets)))  # FIXED: Update train_sites based on actual
+
     else:
+        train_sites = []
         raise NotImplementedError
     if args.debug:
         trainsets = [
@@ -738,7 +886,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--noisy", type=int, default=-1, help="Set a client as a noisy client")
     parser.add_argument(
-        "--alpha", type=float, default=1.0, help="The hyper parameter for tune loss for DC"
+        "--alpha", type=float, default=0.1, help="The hyper parameter for tune loss for DC"
     )
     parser.add_argument(
         "--adaclip",
@@ -770,7 +918,7 @@ if __name__ == "__main__":
         help="Using which mode to do private training. Options: overhead, bounded.",
     )
     parser.add_argument(
-        "--balance_split", action="store_true", help="Activate balance virtual client splitting."
+        "--balance_split", action="store_true", help="Activatebalance virtual client splitting."
     )
     parser.add_argument("--test", action="store_true", help="Running test mode.")
     parser.add_argument("--ckpt", type=str, default="None", help="Path for the testing ckpt")
@@ -957,7 +1105,7 @@ if __name__ == "__main__":
             server_model,
             loss_fun,
             domain_loss_fun,
-            datasets,
+            train_sites,  # FIXED: Changed from datasets to train_sites for consistency
             generalize_sites,
             train_sets,
             val_sets,
@@ -966,6 +1114,7 @@ if __name__ == "__main__":
             val_loaders,
             test_loaders,
         ) = initialize(args, lg)
+        val_sites = train_sites  # FIXED: Set val_sites to train_sites in generalize
     else:
         generalize_sites = None
         (
@@ -982,10 +1131,11 @@ if __name__ == "__main__":
             test_loaders,
         ) = initialize(args, lg)
 
+    # Sau khi chia train_sets và loại leave (nếu có), cập nhật lại số client thực tế
+    args.clients = len(train_sets)
     assert (
         int(args.clients * args.virtual_clients) == len(train_loaders) == len(train_sites)
-    ), f"Virtual client num {args.clients * args.virtual_clients}, train loader num {len(train_loaders)},\
-         train site num {len(train_sites)} do not match."
+    ), f"Virtual client num {args.clients * args.virtual_clients}, train loader num {len(train_loaders)}, train site num {len(train_sites)} do not match."
     assert len(val_loaders) == len(val_sites)  # == int(args.clients)
     train_total_len = sum([len(tr_set) for tr_set in train_sets])
     client_weights = (
@@ -1032,6 +1182,7 @@ if __name__ == "__main__":
         client_weights=client_weights,
         generalize_sites=generalize_sites,
         class_weights=full_class_weights,
+        client_domain_map=client_domain_map if 'client_domain_map' in locals() else None,
     )
 
     trainer.best_changed = False
@@ -1041,7 +1192,7 @@ if __name__ == "__main__":
     print("Client steps:", trainer.client_steps)
 
     if args.resume:
-        checkpoint = torch.load(SAVE_PATH)
+        checkpoint = torch.load(os.path.join(SAVE_PATH, args.ckpt))
         trainer.server_model.load_state_dict(checkpoint["server_model"])
         if args.local_bn:
             for client_idx in range(trainer.client_num):
@@ -1062,7 +1213,10 @@ if __name__ == "__main__":
         trainer.start_iter = 0
 
     if args.test:
-        trainer.inference(args.ckpt, test_loaders, loss_fun, val_sites, process=True)
+        if args.generalize and args.leave is not None and args.leave != "no":
+            trainer.inference(args.ckpt, test_loaders, loss_fun, generalize_sites, process=True)  # FIXED: Use test_loaders and generalize_sites
+        else:
+            trainer.inference(args.ckpt, test_loaders, loss_fun, val_sites, process=True)
     else:
         trainer.start(
             train_loaders, val_loaders, test_loaders, loss_fun, SAVE_PATH, generalize_sites, domain_loss_fun=domain_loss_fun if args.da else None

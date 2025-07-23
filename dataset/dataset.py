@@ -16,9 +16,19 @@ from torch.utils.data import Dataset
 import json
 import pandas as pd
 
-
 local = False if "uac/" in os.environ["HOME"] else True
 
+LABELS = ['epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'healthy']
+
+def get_domain(row):
+    """
+    Hàm này tính domain dựa trên NỘI DUNG Y KHOA của ảnh (loại bệnh).
+    Nó sẽ không được sử dụng trong DFDataset nữa để đảm bảo mỗi client là một domain.
+    """
+    for i, label in enumerate(LABELS[:-1]):  # Exclude healthy first
+        if row[label] == 1:
+            return i
+    return 5  # healthy if no disease
 
 class BaseDataset(Dataset):
     def __init__(self, root_dir, images, labels, transform=None):
@@ -43,8 +53,13 @@ class BaseDataset(Dataset):
         Returns:
             image and its labels
         """
-        items = self.images[index]  # .split('/')
+        items = self.images[index]
         image_name = os.path.join(self.root_dir, self.images[index])
+        # Giả định tên file ảnh cần thêm extension .png
+        # Sửa đổi nếu tên file trong CSV đã có extension
+        if not image_name.endswith('.png'):
+            image_name += '.png'
+            
         image = Image.open(image_name).convert("RGB")
         label = self.labels[index]
         if self.transform is not None:
@@ -54,13 +69,12 @@ class BaseDataset(Dataset):
             "Raw_path": image_name,
             "Name": items,
             "Image": image,
-            "Label": label,
+            "Label": torch.tensor(label, dtype=torch.long), # Đảm bảo label là tensor
             "Site": self.site_idx,
         }
 
     def __len__(self):
         return len(self.images)
-
 
 class DFDataset(BaseDataset):
     def __init__(self, root_dir, data_frame, transform=None, site_idx=None):
@@ -71,9 +85,10 @@ class DFDataset(BaseDataset):
             transform: optional transform to be applied on a sample.
         """
         self.root_dir = root_dir
+        self.data_frame = data_frame
+        # Giả định cột chứa ID ảnh là 'ImageID' và cột nhãn là 'healthy'
         self.images = data_frame["ImageID"].values
         self.labels = data_frame["healthy"].values.astype(np.int64)
-        # self.labels = np.argmax(self.labels, axis=1)
         self.transform = transform
         super(DFDataset, self).__init__(
             root_dir=self.root_dir,
@@ -83,6 +98,24 @@ class DFDataset(BaseDataset):
         )
         self.site_idx = site_idx
 
+    # ===================================================================
+    # SỬA ĐỔI QUAN TRỌNG TẠI ĐÂY
+    # ===================================================================
+    def __getitem__(self, index):
+        """
+        Trả về item dữ liệu.
+        Domain label được lấy trực tiếp từ `self.site_idx` để đảm bảo
+        mỗi client được coi là một domain riêng biệt.
+        """
+        # Lấy item cơ bản (Image, Label, etc.) từ lớp cha
+        item = super().__getitem__(index)
+        
+        # Kiểm tra xem site_idx có tồn tại không
+        if self.site_idx is not None:
+            # Gán domain label bằng ID của client (site_idx)
+            item['Domain'] = torch.tensor(self.site_idx, dtype=torch.long)
+            
+        return item
 
 class DatasetSplit(Dataset):
     def __init__(self, dataset, idxs, client_idx, virtual_idx):

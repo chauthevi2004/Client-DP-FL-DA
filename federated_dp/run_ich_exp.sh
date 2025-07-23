@@ -139,100 +139,119 @@
 #!!! test thử lần 1 !!!#
 #!/bin/bash
 
-# no dp
-# DP-FedAvg
-python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18
-python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18 --da
-# DP-FedAdam
-python fed_train.py --mode fedadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --seed 18
-python fed_train.py --mode fedadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --seed 18 --da
-# DP-FedNova
-python fed_train.py --mode fednova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18
-python fed_train.py --mode fednova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18 --da
-# DP2-RMSProp
-python fed_train.py --mode fed2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --seed 18
-python fed_train.py --mode fed2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --seed 18 --da
+# # no dp
+# # DP-FedAvg
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18 --da
+# # DP-FedAdam
+# python fed_train.py --mode fedadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --seed 18
+# python fed_train.py --mode fedadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --seed 18 --da
+# # DP-FedNova
+# python fed_train.py --mode fednova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18
+# python fed_train.py --mode fednova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18 --da
+# # DP2-RMSProp
+# python fed_train.py --mode fed2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --seed 18
+# python fed_train.py --mode fed2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --seed 18 --da
 
-# z = 0.5
-# DP-FedAvg
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
-# DP-FedAdam
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
-# DP-FedNova
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
-# DP2-RMSProp
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
+# # z = 0.5
+# # DP-FedAvg
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
+# # DP-FedAdam
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
+# # DP-FedNova
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
+# # DP2-RMSProp
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --seed 18 --da
 
-# z=0.5 + our method
-# DP-FedAvg
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
-# DP-FedAdam
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
-# DP-FedNova
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
-# DP2-RMSProp
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
+# # z=0.5 + our method
+# # DP-FedAvg
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
+# # DP-FedAdam
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
+# # DP-FedNova
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
+# # DP2-RMSProp
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 0.5 --ada_vn --seed 18 --da
 
-# z = 1.0
-# DP-FedAvg
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
-# DP-FedAdam
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
-# DP-FedNova
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
-# DP2-RMSProp
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
+# # z = 1.0
+# # DP-FedAvg
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
+# # DP-FedAdam
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
+# # DP-FedNova
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
+# # DP2-RMSProp
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --seed 18 --da
 
-# z=1.0 + our method
-# DP-FedAvg
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
-# DP-FedAdam
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
-# DP-FedNova
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
-# DP2-RMSProp
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
+# # z=1.0 + our method
+# # DP-FedAvg
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
+# # DP-FedAdam
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
+# # DP-FedNova
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
+# # DP2-RMSProp
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.0 --ada_vn --seed 18 --da
 
-# z = 1.5
-# DP-FedAvg
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
-# DP-FedAdam
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
-# DP-FedNova
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
-# DP2-RMSProp
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
+# # z = 1.5
+# # DP-FedAvg
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
+# # DP-FedAdam
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
+# # DP-FedNova
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
+# # DP2-RMSProp
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --seed 18 --da
 
-# z=1.5 + our method
-# DP-FedAvg
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
-python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
-# DP-FedAdam
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
-python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
-# DP-FedNova
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
-python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
-# DP2-RMSProp
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
-python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
+# # z=1.5 + our method
+# # DP-FedAvg
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
+# python fed_train.py --mode dpsgd --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
+# # DP-FedAdam
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
+# python fed_train.py --mode dpadam --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adam_lr 0.003 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
+# # DP-FedNova
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
+# python fed_train.py --mode dpnova --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
+# # DP2-RMSProp
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18
+# python fed_train.py --mode dp2rmsprop --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --rmsprop_lr 3e-5 --adaclip --delta 0.01 --noise_multiplier 1.5 --ada_vn --seed 18 --da
+
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --seed 21
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 0.0003 --seed 21 --resume --ckpt model_best_13
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 17  --da 
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 -VN 1 --rounds 100 --lr 3e-4 --seed 18
+# python fed_train.py --mode fedadam --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --adam_lr 0.003 --seed 21
+# python fed_train.py --mode fednova --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --seed 21
+# python fed_train.py --mode fed2rmsprop --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --rmsprop_lr 3e-5 --seed 21
+
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --seed 21 --da
+# python fed_train.py --mode fedadam --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --adam_lr 0.003 --seed 21 --da
+# python fed_train.py --mode fednova --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --seed 21 --da
+# python fed_train.py --mode fed2rmsprop --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 3e-4 --rmsprop_lr 3e-5 --seed 21 --da
+
+
+python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 --generalize --leave 19 -VN 1 --rounds 100 --lr 3e-4 --seed 24
+python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 20 --generalize --leave 19 -VN 1 --rounds 100 --lr 3e-4 --seed 24 --da
+
+# python fed_train.py --mode fedavg --data RSNA-ICH --batch 16 -N 6 -VN 1 --rounds 20 --lr 0.0003 --seed 22 --resume --ckpt model_best_6

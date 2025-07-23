@@ -1,0 +1,24 @@
+Traceback (most recent call last):
+  File "/home/thevi/Documents/Client-DP-FL/federated_dp/fed_train.py", line 1074, in <module>
+    trainer.start(
+  File "/home/thevi/Documents/Client-DP-FL/federated_dp/base_trainer.py", line 1105, in start
+    self.run(
+  File "/home/thevi/Documents/Client-DP-FL/federated_dp/base_trainer.py", line 947, in run
+    self.test_ckpt(
+  File "/home/thevi/Documents/Client-DP-FL/federated_dp/base_trainer.py", line 531, in test_ckpt
+    test_loss, test_acc = self.test(
+  File "/home/thevi/Documents/Client-DP-FL/federated_dp/base_trainer.py", line 280, in test
+    for step, data in enumerate(data_loader):
+  File "/home/thevi/anaconda3/envs/DP-FL/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
+    data = self._next_data()
+  File "/home/thevi/anaconda3/envs/DP-FL/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/thevi/anaconda3/envs/DP-FL/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/thevi/anaconda3/envs/DP-FL/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/thevi/Documents/Client-DP-FL/dataset/dataset.py", line 48, in __getitem__
+    image = Image.open(image_name).convert("RGB")
+  File "/home/thevi/anaconda3/envs/DP-FL/lib/python3.9/site-packages/PIL/Image.py", line 3465, in open
+    fp = builtins.open(filename, "rb")
+FileNotFoundError: [Errno 2] No such file or directory: '../RSNA-ICH/organized/stage_2_train/ID_bcea015ac.png'
